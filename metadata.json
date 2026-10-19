@@ -1,0 +1,6 @@
+{
+  "name": "FiscalPay 1099 - Enterprise Payroll & Compliance",
+  "description": "Sistema empresarial de nómina, gestión de contratistas independientes y centro oficial de previsualización, emisión e impresión de Formularios IRS 1099-NEC y W-9.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  h1, h2, h3, h4, .font-heading {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  vertical-align: middle;
+}
+
+.material-symbols-fill {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Official IRS Form 1099-NEC Grid Styles */
+.irs-box {
+  border: 1px solid #0f172a;
+  position: relative;
+  background-color: #ffffff;
+}
+
+.irs-box-red {
+  border: 1px solid #c60b1e;
+  position: relative;
+  background-color: #ffffff;
+}
+
+.irs-box-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 8.5px;
+  line-height: 10px;
+  font-weight: 600;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.irs-box-label-red {
+  font-family: 'Inter', sans-serif;
+  font-size: 8.5px;
+  line-height: 10px;
+  font-weight: 700;
+  color: #c60b1e;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.irs-value {
+  font-family: 'Roboto Mono', 'Inter', monospace;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: #0b1c30;
+}
+
+.watermark-official {
+  background-image: repeating-linear-gradient(45deg, rgba(203, 213, 225, 0.08) 0, rgba(203, 213, 225, 0.08) 2px, transparent 0, transparent 8px);
+}
+
+.irs-form-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 2px 0;
+  font-family: inherit;
+  color: #0b1c30;
+  outline: none;
+}
+
+.irs-form-input:focus {
+  outline: 1px dashed #006c4a;
+  background: rgba(248, 249, 255, 0.6);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-irs-form, #printable-irs-form *,
+  #printable-irs-w2-form, #printable-irs-w2-form * {
+    visibility: visible;
+  }
+  #printable-irs-form,
+  #printable-irs-w2-form {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 8.5in !important;
+    margin: 0 auto;
+    padding: 20px;
+    box-shadow: none !important;
+    border: 2px solid #000 !important;
+    background: #ffffff !important;
+  }
+}
