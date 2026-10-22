@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-64 flex-shrink-0 h-screen sticky top-0 flex flex-col justify-between p-4 bg-white border-r border-[#c6c6cd]/40 z-40 select-none overflow-y-auto">
+    <aside className="hidden md:flex w-64 flex-shrink-0 h-screen sticky top-0 flex-col justify-between p-4 bg-white border-r border-[#c6c6cd]/40 z-40 select-none overflow-y-auto">
       <div className="flex flex-col gap-4">
         {/* App Header / Logo */}
         <div

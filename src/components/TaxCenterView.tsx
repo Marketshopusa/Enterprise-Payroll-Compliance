@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ActiveFormTaxType, CompanyProfile, Contractor, CopyType, Form1099Data, FormW2Data, Language, PaymentRecord } from '../types';
 import { translations } from '../utils/translations';
-import { Irs1099Form } from './Irs1099Form';
-import { IrsW2Form } from './IrsW2Form';
 import { generateIrsPub1220Txt, downloadFile } from '../utils/irsEFileGenerator';
+import { FormViewerModal } from './modals/FormViewerModal';
 
 interface TaxCenterViewProps {
   contractors: Contractor[];
@@ -35,7 +34,7 @@ export const TaxCenterView: React.FC<TaxCenterViewProps> = ({
   const t = translations[lang];
   const [activeFormType, setActiveFormType] = useState<ActiveFormTaxType>('1099-NEC');
   const [copyType, setCopyType] = useState<CopyType>('Copy B');
-  const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [isFormViewerOpen, setIsFormViewerOpen] = useState(false);
   const [pdfDownloadCount, setPdfDownloadCount] = useState<number>(0);
 
   const selectedContractor = contractors.find((c) => c.id === selectedContractorId) || null;
@@ -142,7 +141,6 @@ export const TaxCenterView: React.FC<TaxCenterViewProps> = ({
         box7StateIncome: calculatedBox1,
       });
 
-      // Also pre-fill W-2 with exact statutory calculations
       const nameParts = selectedContractor.name.split(' ');
       const fName = nameParts[0] || '';
       const lName = nameParts.slice(1).join(' ') || '';
@@ -187,7 +185,6 @@ export const TaxCenterView: React.FC<TaxCenterViewProps> = ({
         box20LocalityName: '',
       });
     } else {
-      // Clean blank state
       setFormData({
         year: fiscalYear,
         voidForm: false,
@@ -211,44 +208,6 @@ export const TaxCenterView: React.FC<TaxCenterViewProps> = ({
         box6State: '',
         box6PayerStateNo: '',
         box7StateIncome: 0,
-      });
-
-      setW2FormData({
-        year: fiscalYear,
-        voidForm: false,
-        employerTin: company.isConfigured ? company.ein : '',
-        employerName: company.isConfigured ? company.legalName : '',
-        employerAddress: company.isConfigured ? company.address : '',
-        employerCityStateZip: company.isConfigured ? `${company.city}, ${company.state} ${company.zip}` : '',
-        controlNumber: '',
-        employeeSsn: '',
-        employeeFirstName: '',
-        employeeLastName: '',
-        employeeAddress: '',
-        employeeCityStateZip: '',
-        box1Wages: 0,
-        box2FederalWithheld: 0,
-        box3SocialSecurityWages: 0,
-        box4SocialSecurityWithheld: 0,
-        box5MedicareWages: 0,
-        box6MedicareWithheld: 0,
-        box7SocialSecurityTips: 0,
-        box8AllocatedTips: 0,
-        box10DependentCare: 0,
-        box11NonqualifiedPlans: 0,
-        box12Code: '',
-        box12Amount: 0,
-        box13Statutory: false,
-        box13RetirementPlan: false,
-        box13ThirdPartySickPay: false,
-        box14Other: '',
-        box15State: '',
-        box15StateId: '',
-        box16StateWages: 0,
-        box17StateWithheld: 0,
-        box18LocalWages: 0,
-        box19LocalWithheld: 0,
-        box20LocalityName: '',
       });
     }
   }, [selectedContractor, company, calculatedBox1, fiscalYear]);
@@ -279,434 +238,421 @@ export const TaxCenterView: React.FC<TaxCenterViewProps> = ({
   const hasData = Boolean(selectedContractor || formData.recipientName || formData.box1Compensation > 0);
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-      {/* TOOLBAR: EXPORT / PRINT / COPY SELECTOR */}
-      <div className="bg-white border-b border-[#c6c6cd]/60 px-6 py-2.5 flex flex-wrap items-center justify-between gap-4 z-20 shrink-0">
-        {/* Copy Selector Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-[#eff4ff] rounded-lg border border-[#c6c6cd]/70 text-xs">
-          <button
-            onClick={() => setCopyType('Copy B')}
-            className={`px-3 py-1.5 rounded font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-              copyType === 'Copy B'
-                ? 'bg-white text-[#0b1c30] shadow-xs border border-[#c6c6cd]/50'
-                : 'text-[#45464d] hover:text-[#0b1c30]'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-[#006c4a]"></span>
-            <span>{t.copyB}</span>
-          </button>
-
-          <button
-            onClick={() => setCopyType('Copy A')}
-            className={`px-3 py-1.5 rounded font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-              copyType === 'Copy A'
-                ? 'bg-white text-[#c60b1e] shadow-xs border border-[#c6c6cd]/50'
-                : 'text-[#45464d] hover:text-[#0b1c30]'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-[#c60b1e]"></span>
-            <span>{t.copyA}</span>
-          </button>
-
-          <button
-            onClick={() => setCopyType('Copy C')}
-            className={`px-3 py-1.5 rounded font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-              copyType === 'Copy C'
-                ? 'bg-white text-[#0b1c30] shadow-xs border border-[#c6c6cd]/50'
-                : 'text-[#45464d] hover:text-[#0b1c30]'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-            <span>{t.copyC}</span>
-          </button>
-        </div>
-
-        {/* Action Buttons Cluster */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleExportTxt}
-            className="px-3 py-1.5 rounded-lg border border-[#c6c6cd] hover:bg-slate-50 text-[#0b1c30] text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-            title="Exportar archivo oficial en formato IRS FIRE System (Pub. 1220)"
-          >
-            <span className="material-symbols-outlined text-base">file_upload</span>
-            <span>{t.exportTxt}</span>
-          </button>
-
-          <button
-            onClick={() => selectedContractor && onOpenPaymentsSummary(selectedContractor.id)}
-            disabled={!selectedContractor}
-            className={`px-3 py-1.5 rounded-lg border border-[#c6c6cd] text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              selectedContractor
-                ? 'text-[#0b1c30] hover:bg-slate-50 cursor-pointer shadow-xs'
-                : 'text-[#76777d] bg-slate-50 cursor-not-allowed opacity-60'
-            }`}
-            title="Ver desglose de pagos emitidos"
-          >
-            <span className="material-symbols-outlined text-base">table_chart</span>
-            <span>{t.paymentSummary}</span>
-          </button>
-
-          <button
-            onClick={() => selectedContractor && onOpenEmailModal(selectedContractor.id)}
-            disabled={!selectedContractor}
-            className={`px-3 py-1.5 rounded-lg border border-[#c6c6cd] text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              selectedContractor
-                ? 'text-[#0b1c30] hover:bg-slate-50 cursor-pointer shadow-xs'
-                : 'text-[#76777d] bg-slate-50 cursor-not-allowed opacity-60'
-            }`}
-            title="Enviar comprobante oficial por correo"
-          >
-            <span className="material-symbols-outlined text-base">mail</span>
-            <span>{t.sendEmail}</span>
-          </button>
-
-          <button
-            onClick={handleDownloadPdf}
-            className="px-3 py-1.5 rounded-lg border border-[#c6c6cd] text-[#0b1c30] hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-            title="Descargar Planilla Oficial en PDF"
-          >
-            <span className="material-symbols-outlined text-base">download</span>
-            <span>Descargar Planilla Oficial (PDF)</span>
-          </button>
-
-          <button
-            onClick={handlePrint}
-            className="px-4 py-1.5 rounded-lg bg-[#000000] hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
-            title="Imprimir Planilla Oficial en Formato de Impresión IRS"
-          >
-            <span className="material-symbols-outlined text-base">print</span>
-            <span>Imprimir Formulario Oficial ({activeFormType})</span>
-          </button>
-        </div>
-      </div>
-
-      {/* FORM TYPE SWITCHER: 1099-NEC vs W-2 (CRUCIAL FOR ACCOUNTANTS & EMPLOYEES) */}
-      <div className="bg-slate-100 border-b border-slate-300 px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-800 uppercase text-[11px] tracking-wider flex items-center gap-1">
-            <span className="material-symbols-outlined text-base text-[#006c4a]">verified</span>
-            Formulario Fiscal Oficial ({fiscalYear}):
-          </span>
-
-          <div className="flex items-center p-0.5 bg-white rounded-lg border border-slate-300 shadow-2xs">
-            <button
-              onClick={() => setActiveFormType('1099-NEC')}
-              className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeFormType === '1099-NEC'
-                  ? 'bg-[#131b2e] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-black'
-              }`}
-            >
-              <span>Formulario 1099-NEC</span>
-              <span className="text-[10px] font-normal opacity-80">(Contratistas / 1099)</span>
-            </button>
-
-            <button
-              onClick={() => setActiveFormType('W-2')}
-              className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeFormType === 'W-2'
-                  ? 'bg-[#006c4a] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-black'
-              }`}
-            >
-              <span>Formulario W-2</span>
-              <span className="text-[10px] font-normal opacity-80">(Empleados en Nómina)</span>
-            </button>
+    <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#f8f9ff]">
+      {/* Top Mobile-Friendly Sub-Header */}
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Centro Fiscal & Emisión Oficial
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+              Año {fiscalYear}
+            </span>
           </div>
+          <h1 className="text-lg sm:text-xl font-extrabold text-[#0b1c30] tracking-tight font-heading mt-0.5">
+            Gestión y Emisión de Planillas Oficiales IRS
+          </h1>
         </div>
 
-        {/* CPA Guidance Pill */}
-        <div className="text-[11px] text-slate-600 flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-full border border-slate-200">
-          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>
-            {activeFormType === '1099-NEC'
-              ? 'IRS Cat. No. 74162Z Oficial para Servicios Independientes'
-              : 'IRS / SSA Cat. No. 10134D Oficial con Fórmulas FICA (6.2% SS + 1.45% Medicare)'}
-          </span>
+        {/* Form Type Switcher */}
+        <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs shadow-inner">
+          <button
+            onClick={() => setActiveFormType('1099-NEC')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeFormType === '1099-NEC'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-black'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm text-[#006c4a]">badge</span>
+            <span>1099-NEC (Contratistas)</span>
+          </button>
+          <button
+            onClick={() => setActiveFormType('W-2')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeFormType === 'W-2'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-black'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm text-[#006c4a]">person</span>
+            <span>W-2 (Empleados)</span>
+          </button>
         </div>
       </div>
 
-      {/* CONTENT AREA: FORM PREVIEW & SIDE AUDIT */}
-      <main className="flex-1 overflow-y-auto p-6 bg-[#f8f9ff]">
-        <div className="max-w-[1400px] mx-auto grid grid-cols-12 gap-6 items-start">
-          {/* ========================================== */}
-          {/* LEFT: THE OFFICIAL IRS FORM CANVAS        */}
-          {/* ========================================== */}
-          <section className="col-span-12 lg:col-span-8 flex flex-col gap-4">
-            {/* Banner: Legal Compliance & Status */}
-            <div className="bg-white border border-[#c6c6cd]/70 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-3">
-                <span className="w-9 h-9 rounded-full bg-[#eff4ff] text-[#006c4a] border border-[#c6c6cd]/60 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-xl">gavel</span>
+      {/* Main Responsive Body */}
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+        <div className="max-w-[1300px] mx-auto space-y-5">
+          {/* ======================================================== */}
+          {/* HERO CARD: PLANILLA OFICIAL (CLEAN, COMPACT, ON-DEMAND) */}
+          {/* ======================================================== */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50/60 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16"></div>
+
+            <div className="space-y-3 max-w-2xl relative z-10">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#131b2e] text-white font-mono">
+                  {activeFormType} • Cat. {activeFormType === '1099-NEC' ? '74162Z' : '10134D'}
                 </span>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="font-heading font-bold text-sm sm:text-base text-[#0b1c30]">
-                      {activeFormType === '1099-NEC'
-                        ? `Plantilla Oficial IRS Formulario 1099-NEC (${fiscalYear})`
-                        : `Plantilla Oficial IRS Formulario W-2 (${fiscalYear})`}
-                    </h2>
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                      Certificada para Contadores (CPA) & IRS
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                  Certificada para Contadores (CPA)
+                </span>
+                <span className="text-xs text-slate-500 font-mono">
+                  Año Fiscal: {fiscalYear}
+                </span>
+              </div>
+
+              <div>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-[#0b1c30] tracking-tight font-heading">
+                  {activeFormType === '1099-NEC'
+                    ? `Formulario IRS 1099-NEC Oficial (${fiscalYear})`
+                    : `Formulario IRS W-2 Oficial (${fiscalYear})`}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                  {selectedContractor
+                    ? `Planilla lista para emisión para ${selectedContractor.name} (${selectedContractor.tinType}: ${selectedContractor.tin}). Total compensación: $${calculatedBox1.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`
+                    : 'Planilla oficial del IRS en blanco lista para editar, precargar con contratistas o imprimir para presentación fiscal.'}
+                </p>
+              </div>
+
+              {/* Beneficiary Badge */}
+              <div className="inline-flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <div className="w-6 h-6 rounded-full bg-[#e5eeff] text-[#006c4a] font-bold flex items-center justify-center text-xs shrink-0">
+                  {selectedContractor ? selectedContractor.name.charAt(0) : '?'}
+                </div>
+                <div className="truncate">
+                  <span className="font-bold text-slate-800">
+                    {selectedContractor ? selectedContractor.name : 'Ningún contratista seleccionado (Planilla en blanco)'}
+                  </span>
+                  {selectedContractor && (
+                    <span className="text-slate-500 ml-1.5 font-mono text-[11px]">
+                      • {selectedContractor.city}, {selectedContractor.state}
                     </span>
-                  </div>
-                  <p className="text-xs text-[#45464d] mt-0.5">
-                    {activeFormType === '1099-NEC'
-                      ? `Formulario gubernamental oficial (Cat. No. 74162Z) para el año fiscal ${fiscalYear}. Cumple con todas las normas del IRS Publication 1179.`
-                      : `Formulario oficial de salario y retenciones (Cat. No. 10134D) para empleados en nómina formal. Incluye fórmulas automáticas de Seguro Social y Medicare.`}
-                  </p>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Page Scale / Zoom Indicator */}
-              <div className="flex items-center gap-1 bg-[#eff4ff] rounded-lg p-1 text-xs text-[#45464d] font-medium shrink-0">
+            {/* ACTION CLUSTER (TOUCH FRIENDLY) */}
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 w-full sm:w-auto shrink-0 relative z-10">
+              {/* PRIMARY BUTTON: OPEN THE FULL OFFICIAL FORM VIEWER / MODAL */}
+              <button
+                onClick={() => setIsFormViewerOpen(true)}
+                className="w-full sm:w-auto px-5 py-3 rounded-xl bg-[#006c4a] hover:bg-[#005137] text-white font-bold text-sm flex items-center justify-center gap-2.5 shadow-md shadow-emerald-900/10 active:scale-98 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">open_in_full</span>
+                <span>Ver / Editar Planilla Oficial</span>
+              </button>
+
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setZoomLevel((z) => Math.max(z - 10, 80))}
-                  className="p-1 hover:bg-white rounded transition-colors cursor-pointer"
-                  title="Alejar"
+                  onClick={handlePrint}
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#131b2e] hover:bg-slate-900 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition-all"
+                  title="Imprimir Formulario Oficial"
                 >
-                  <span className="material-symbols-outlined text-sm">zoom_out</span>
+                  <span className="material-symbols-outlined text-base">print</span>
+                  <span>Imprimir Oficial</span>
                 </button>
-                <span className="px-1.5 font-mono text-[11px]">{zoomLevel}% (Letter)</span>
+
                 <button
-                  onClick={() => setZoomLevel((z) => Math.min(z + 10, 130))}
-                  className="p-1 hover:bg-white rounded transition-colors cursor-pointer"
-                  title="Acercar"
+                  onClick={handleDownloadPdf}
+                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                  title="Descargar PDF"
                 >
-                  <span className="material-symbols-outlined text-sm">zoom_in</span>
+                  <span className="material-symbols-outlined text-base">download</span>
+                  <span>Descargar PDF</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportTxt}
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center justify-center gap-1 cursor-pointer"
+                  title="Exportar archivo IRS FIRE TXT (Pub. 1220)"
+                >
+                  <span className="material-symbols-outlined text-sm">file_upload</span>
+                  <span>Exportar e-File TXT</span>
+                </button>
+
+                <button
+                  onClick={() => selectedContractor && onOpenEmailModal(selectedContractor.id)}
+                  disabled={!selectedContractor}
+                  className={`flex-1 px-3 py-2 rounded-lg border text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
+                    selectedContractor
+                      ? 'border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer'
+                      : 'border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed opacity-60'
+                  }`}
+                  title="Enviar por Correo"
+                >
+                  <span className="material-symbols-outlined text-sm">mail</span>
+                  <span>Enviar Email</span>
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Official IRS Document Container */}
-            <div className="overflow-x-auto pb-4">
-              {activeFormType === '1099-NEC' ? (
-                <Irs1099Form
-                  formData={formData}
-                  onChange={handle1099FieldChange}
-                  copyType={copyType}
-                  zoomLevel={zoomLevel}
-                />
-              ) : (
-                <IrsW2Form
-                  formData={w2FormData}
-                  onChange={handleW2FieldChange}
-                  copyType={copyType}
-                  zoomLevel={zoomLevel}
-                />
-              )}
+          {/* ======================================================== */}
+          {/* FINANCIAL SUMMARY OF THIS STATEMENT (4 STAT CARDS)       */}
+          {/* ======================================================== */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                {activeFormType === '1099-NEC' ? 'Casilla 1 (Compensación Bruta)' : 'Casilla 1 (Salarios y Propinas)'}
+              </span>
+              <p className="text-xl sm:text-2xl font-bold font-mono text-[#006c4a] mt-1 tracking-tight">
+                ${calculatedBox1.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-slate-400 mt-0.5 block truncate">
+                {contractorYearPayments.length} desembolsos en {fiscalYear}
+              </span>
             </div>
 
-            {/* Bottom Contextual Explanatory Strip */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="bg-white border border-[#c6c6cd]/70 p-3 rounded-lg shadow-xs">
-                <div className="flex items-center gap-1.5 text-[#006c4a] font-semibold text-xs">
-                  <span className="material-symbols-outlined text-base">verified_user</span>
-                  <span>Validación de Algoritmo IRS</span>
-                </div>
-                <p className="text-xs text-[#45464d] mt-1">
-                  Verificación de 9 dígitos para SSN/EIN y congruencia matemática de retenciones fiscales.
-                </p>
-              </div>
-
-              <div className="bg-white border border-[#c6c6cd]/70 p-3 rounded-lg shadow-xs">
-                <div className="flex items-center gap-1.5 text-[#0b1c30] font-semibold text-xs">
-                  <span className="material-symbols-outlined text-base">schedule</span>
-                  <span>Plazo Límite Legal {fiscalYear}</span>
-                </div>
-                <p className="text-xs text-[#45464d] mt-1">
-                  Entrega al receptor y transmisión electrónica ante IRS / SSA:{' '}
-                  <strong className="text-[#0b1c30]">31 de Enero de {fiscalYear + 1}</strong>.
-                </p>
-              </div>
-
-              <div className="bg-white border border-[#c6c6cd]/70 p-3 rounded-lg shadow-xs">
-                <div className="flex items-center gap-1.5 text-[#0b1c30] font-semibold text-xs">
-                  <span className="material-symbols-outlined text-base">cloud_sync</span>
-                  <span>Sincronización FIRE & IRIS</span>
-                </div>
-                <p className="text-xs text-[#45464d] mt-1">
-                  Estructura compatible para transmisión electrónica directa al IRS portal y sistemas de contabilidad.
-                </p>
-              </div>
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                Casilla 4 (Retención Federal)
+              </span>
+              <p className="text-xl sm:text-2xl font-bold font-mono text-slate-900 mt-1 tracking-tight">
+                ${(selectedContractor?.federalWithholding || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-slate-400 mt-0.5 block truncate">
+                Backup withholding
+              </span>
             </div>
-          </section>
 
-          {/* ========================================== */}
-          {/* RIGHT: AUDIT & ACCOUNTANT INSTRUCTIONS    */}
-          {/* ========================================== */}
-          <aside className="col-span-12 lg:col-span-4 flex flex-col gap-4">
-            {/* Accounting Audit Verification Card */}
-            <div className="bg-white border border-[#c6c6cd]/70 rounded-xl p-5 shadow-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                {activeFormType === '1099-NEC' ? 'Casilla 5 (Retención Estatal)' : 'FICA Retenido (SS + Med)'}
+              </span>
+              <p className="text-xl sm:text-2xl font-bold font-mono text-slate-900 mt-1 tracking-tight">
+                {activeFormType === '1099-NEC'
+                  ? `$${(selectedContractor?.stateWithholding || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                  : `$${(w2FormData.box4SocialSecurityWithheld + w2FormData.box6MedicareWithheld).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              </p>
+              <span className="text-[10px] text-slate-400 mt-0.5 block truncate">
+                {activeFormType === '1099-NEC' ? selectedContractor?.state || 'CA' : 'Fórmulas 6.2% + 1.45%'}
+              </span>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                Cumplimiento Tributario
+              </span>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${hasData ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                <p className="text-sm font-bold text-slate-900 truncate">
+                  {hasData ? 'Listo para Emisión' : 'Planilla en Blanco'}
+                </p>
+              </div>
+              <span className="text-[10px] text-slate-400 mt-0.5 block truncate">
+                {selectedContractor?.w9Status === 'signed' ? 'W-9 Archivado ✓' : 'Sin archivar'}
+              </span>
+            </div>
+          </div>
+
+          {/* ======================================================== */}
+          {/* GRID: RECIPIENT SELECTOR & ACCOUNTING AUDIT CHECKLIST    */}
+          {/* ======================================================== */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            {/* Left: Quick Recipient Directory (7 cols) */}
+            <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#76777d] text-xl">fact_check</span>
-                  <h3 className="font-heading font-bold text-sm sm:text-base text-[#0b1c30]">
-                    Auditoría Contable
+                  <span className="material-symbols-outlined text-[#006c4a] text-xl">group</span>
+                  <h3 className="font-heading font-bold text-sm sm:text-base text-slate-900">
+                    Seleccionar Beneficiario para Emisión ({contractors.length})
                   </h3>
                 </div>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                    hasData
-                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                      : 'bg-[#eff4ff] text-[#76777d] border-[#c6c6cd]'
-                  }`}
+                <button
+                  onClick={onOpenContractorDirectory}
+                  className="text-xs text-[#006c4a] hover:underline font-semibold cursor-pointer"
                 >
-                  {hasData ? 'ESTADO: CONCILIADO' : t.statusNoData}
-                </span>
+                  Directorio Completo →
+                </button>
               </div>
 
-              {/* Audit Checklist Items */}
-              <div className="mt-4 flex flex-col gap-3">
-                <div className="flex items-start gap-3 p-2.5 rounded-lg bg-[#f8f9ff] border border-[#c6c6cd]/60">
-                  <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                    hasData ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
-                  }`}>
-                    <span className="material-symbols-outlined text-xs">
-                      {hasData ? 'check' : 'hourglass_empty'}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-[#0b1c30]">
-                      {activeFormType === '1099-NEC' ? 'Conciliación Box 1 con Nómina' : 'Total Salarios Brutos (Box 1)'}
-                    </p>
-                    <p className="text-[11px] text-[#45464d] mt-0.5">
-                      {selectedContractor
-                        ? `${contractorYearPayments.length} desembolsos auditados en ${fiscalYear} para ${selectedContractor.name}.`
-                        : 'Sin beneficiario seleccionado. Ingresa un perfil para conciliar.'}
-                    </p>
-                    <span className="inline-block mt-1 font-mono text-xs font-bold text-[#0b1c30] bg-white px-2 py-0.5 rounded border border-[#c6c6cd]/80">
-                      $ {(activeFormType === '1099-NEC' ? formData.box1Compensation : w2FormData.box1Wages).toFixed(2)} USD
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-2.5 rounded-lg bg-[#f8f9ff] border border-[#c6c6cd]/60">
-                  <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                    selectedContractor?.w9Status === 'signed'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-slate-200 text-slate-500'
-                  }`}>
-                    <span className="material-symbols-outlined text-xs">
-                      {selectedContractor?.w9Status === 'signed' ? 'verified' : 'description'}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-[#0b1c30]">
-                        {activeFormType === '1099-NEC' ? 'Formulario W-9 en Archivo' : 'Formulario W-4 del Empleado'}
-                      </p>
-                      {selectedContractor && (
-                        <button
-                          onClick={() => onOpenW9Modal(selectedContractor)}
-                          className="text-[10.5px] text-[#006c4a] hover:underline font-semibold cursor-pointer"
-                        >
-                          Ver Archivo
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[#45464d] mt-0.5">
-                      {selectedContractor
-                        ? selectedContractor.w9Status === 'signed'
-                          ? `Validado y firmado digitalmente (${selectedContractor.w9SignedDate || `${fiscalYear}-01-15`})`
-                          : 'Pendiente de firma oficial'
-                        : 'Sin adjunto fiscal'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-2.5 rounded-lg bg-[#f8f9ff] border border-[#c6c6cd]/60">
-                  <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                    selectedContractor?.tinMatched
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-slate-200 text-slate-500'
-                  }`}>
-                    <span className="material-symbols-outlined text-xs">
-                      {selectedContractor?.tinMatched ? 'shield' : 'shield_moon'}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-[#0b1c30]">Validación IRS TIN Matching</p>
-                    <p className="text-[11px] text-[#45464d] mt-0.5">
-                      {selectedContractor
-                        ? 'Formato válido ante la base de datos de la administración fiscal'
-                        : 'Pendiente de validación'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Guía Contable para Empleados vs Contratistas (Anti-problemas con el CPA) */}
-            <div className="bg-white border border-[#c6c6cd]/70 rounded-xl p-5 shadow-xs">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                <span className="material-symbols-outlined text-[#006c4a] text-xl">school</span>
-                <h3 className="font-heading font-bold text-sm text-[#0b1c30]">
-                  Instrucciones para el Contador (CPA)
-                </h3>
-              </div>
-
-              <div className="mt-3 text-xs text-[#45464d] space-y-2.5 leading-relaxed">
-                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
-                  <p className="font-bold text-[11px]">
-                    ¿Cómo evitar problemas con el contador?
-                  </p>
-                  <p className="text-[10.5px] mt-1 leading-snug">
-                    • <strong>Formulario 1099-NEC:</strong> Se entrega a <em>contratistas independientes</em> (freelancers, subcontratistas, proveedores de servicios profesionales). Se declara en el Schedule C del Formulario 1040.
-                    <br />
-                    • <strong>Formulario W-2:</strong> Se entrega a <em>empleados formales en nómina</em> sujeta a retenciones de Seguro Social y Medicare.
-                  </p>
-                </div>
-
-                <div className="p-3 bg-[#f8f9ff] rounded-lg border border-[#c6c6cd]/60 space-y-1">
-                  <p className="font-semibold text-[#0b1c30] flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm text-[#006c4a]">check_circle</span>
-                    <span>Validez Legal ante el IRS</span>
-                  </p>
-                  <p className="text-[11px]">
-                    Ambas planillas cumplen con el estándar OCR y Catálogo oficial del IRS para el año fiscal {fiscalYear}. Puedes imprimirlas directamente en papel estándar carta (8.5 x 11 pulgadas).
-                  </p>
-                </div>
-              </div>
-
+              {/* Blank Template Option */}
               <button
-                onClick={() => selectedContractor && onOpenEmailModal(selectedContractor.id)}
-                disabled={!selectedContractor}
-                className={`w-full mt-4 py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
-                  selectedContractor
-                    ? 'border-[#006c4a] bg-[#006c4a] hover:bg-[#005137] text-white cursor-pointer shadow-xs'
-                    : 'border-[#c6c6cd] text-[#76777d] bg-slate-50 cursor-not-allowed opacity-60'
+                onClick={() => onSelectContractor(null)}
+                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                  !selectedContractorId
+                    ? 'border-[#006c4a] bg-emerald-50/70 ring-1 ring-[#006c4a]'
+                    : 'border-slate-200 hover:bg-slate-50'
                 }`}
-                title={selectedContractor ? 'Enviar Comprobante al Beneficiario' : 'Selecciona un beneficiario para enviar'}
               >
-                <span className="material-symbols-outlined text-base">forward_to_inbox</span>
-                <span>Enviar Planilla Oficial por Correo</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-200 text-slate-700 font-bold flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-sm">edit_note</span>
+                  </div>
+                  <div>
+                    <p className="font-bold text-xs text-slate-900">Modo Planilla en Blanco (Rellenar Libre)</p>
+                    <p className="text-[11px] text-slate-500">Permite escribir cualquier dato y monto manualmente</p>
+                  </div>
+                </div>
+                {!selectedContractorId && (
+                  <span className="text-xs font-bold text-[#006c4a] px-2 py-0.5 rounded-full bg-white border border-emerald-300">
+                    Activo
+                  </span>
+                )}
               </button>
+
+              {/* Contractors List */}
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {contractors.map((c) => {
+                  const isSelected = selectedContractorId === c.id;
+                  const cYearPayments = payments.filter((p) => p.contractorId === c.id && p.year === fiscalYear);
+                  const total = cYearPayments.reduce((s, p) => s + p.amount, 0);
+
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => onSelectContractor(c.id)}
+                      className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-[#006c4a] bg-emerald-50/70 ring-1 ring-[#006c4a]'
+                          : 'border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-[#eff4ff] text-[#006c4a] font-bold text-xs flex items-center justify-center shrink-0">
+                          {c.name.charAt(0)}
+                        </div>
+                        <div className="truncate">
+                          <p className="font-bold text-xs text-slate-900 truncate">{c.name}</p>
+                          <p className="text-[11px] text-slate-500 font-mono truncate">
+                            {c.tinType}: {c.tin} • {c.businessName || `${c.city}, ${c.state}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0 ml-2">
+                        <span className="text-xs font-bold font-mono text-slate-900 block">
+                          ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {cYearPayments.length} pagos
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Quick Contractor Directory Shortcut */}
-            <div className="bg-white border border-dashed border-[#c6c6cd] rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-[#eff4ff] flex items-center justify-center mx-auto mb-2 text-[#76777d]">
-                <span className="material-symbols-outlined text-xl">group</span>
+            {/* Right: Accounting Audit & CPA Instructions (5 cols) */}
+            <div className="lg:col-span-5 space-y-4">
+              {/* Audit Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3.5">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#006c4a] text-lg">verified_user</span>
+                    <h3 className="font-heading font-bold text-xs sm:text-sm text-slate-900">
+                      Verificación & Auditoría Contable
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                    IRS Validado
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-emerald-600 text-sm mt-0.5">check_circle</span>
+                    <div className="flex-1">
+                      <p className="font-semibold text-slate-800">Conciliación con Libro Mayor</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {calculatedBox1 > 0
+                          ? `Total acumulado auditado de $${calculatedBox1.toFixed(2)} USD para la Casilla 1.`
+                          : 'Sin pagos registrados en este ejercicio.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-emerald-600 text-sm mt-0.5">check_circle</span>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-slate-800">Formulario W-9 Oficial</p>
+                        {selectedContractor && (
+                          <button
+                            onClick={() => onOpenW9Modal(selectedContractor)}
+                            className="text-[10px] text-[#006c4a] font-bold hover:underline cursor-pointer"
+                          >
+                            Ver W-9
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {selectedContractor?.w9Status === 'signed'
+                          ? `Firmado digitalmente el ${selectedContractor.w9SignedDate || `${fiscalYear}-01-15`}.`
+                          : 'Pendiente de adjuntar o firmar.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-emerald-600 text-sm mt-0.5">check_circle</span>
+                    <div className="flex-1">
+                      <p className="font-semibold text-slate-800">TIN Matching & Algoritmo IRS</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Estructura válida de 9 dígitos para emisión reglamentaria ante el IRS.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <h4 className="font-heading font-semibold text-xs text-[#0b1c30]">
-                Directorio de Contratistas y Empleados
-              </h4>
-              <p className="text-[11px] text-[#76777d] mt-1 mb-3">
-                Selecciona cualquier perfil para generar de inmediato su comprobante tributario {fiscalYear}.
-              </p>
-              <button
-                onClick={onOpenContractorDirectory}
-                className="w-full py-2 px-3 rounded-lg border border-[#c6c6cd] bg-white hover:bg-slate-50 text-[#0b1c30] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-base">search</span>
-                <span>Explorar Directorio</span>
-              </button>
+
+              {/* CPA Guidance Box */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-2.5">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <span className="material-symbols-outlined text-[#006c4a] text-lg">school</span>
+                  <h4 className="font-heading font-bold text-xs text-slate-900">
+                    Guía Rápida para el Contador (CPA)
+                  </h4>
+                </div>
+
+                <div className="text-[11px] text-slate-600 space-y-2 leading-relaxed">
+                  <p>
+                    <strong>• Formulario 1099-NEC:</strong> Se entrega a contratistas independientes (autónomos) para declarar en el Schedule C del Formulario 1040.
+                  </p>
+                  <p>
+                    <strong>• Formulario W-2:</strong> Se entrega a trabajadores en plantilla formal para retenciones de Seguro Social y Medicare (FICA).
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setIsFormViewerOpen(true)}
+                  className="w-full mt-2 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">visibility</span>
+                  <span>Abrir Planilla en Modo Pantalla Completa</span>
+                </button>
+              </div>
             </div>
-          </aside>
+          </div>
         </div>
       </main>
+
+      {/* FORM VIEWER MODAL: OPENS THE AUTHENTIC FULL OFFICIAL IRS FORM ON TAP */}
+      <FormViewerModal
+        isOpen={isFormViewerOpen}
+        onClose={() => setIsFormViewerOpen(false)}
+        activeFormType={activeFormType}
+        setActiveFormType={setActiveFormType}
+        copyType={copyType}
+        setCopyType={setCopyType}
+        formData={formData}
+        on1099Change={handle1099FieldChange}
+        w2FormData={w2FormData}
+        onW2Change={handleW2FieldChange}
+        onPrint={handlePrint}
+        onDownloadPdf={handleDownloadPdf}
+        contractorName={selectedContractor?.name}
+        fiscalYear={fiscalYear}
+      />
     </div>
   );
 };

@@ -28,8 +28,11 @@ import { DemoVideoModal } from './components/modals/DemoVideoModal';
 import { W9ViewModal } from './components/modals/W9ViewModal';
 import { PaymentsSummaryModal } from './components/modals/PaymentsSummaryModal';
 
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { MobileMenuDrawer } from './components/modals/MobileMenuDrawer';
+
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<NavTab>('tax-center');
+  const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [lang, setLang] = useState<Language>('es');
   const [fiscalYear, setFiscalYear] = useState<number>(2026);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -46,6 +49,9 @@ export default function App() {
   const [irsFireConfigured, setIrsFireConfigured] = useState<boolean>(() => {
     return Boolean(company.transmitterControlCode);
   });
+
+  // Mobile drawer state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Modals state
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -286,98 +292,125 @@ export default function App() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenHelp={() => setCurrentTab('soporte')}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
-        {/* View Switcher */}
-        {currentTab === 'dashboard' && (
-          <DashboardView
-            contractors={contractors}
-            payments={payments}
-            fiscalYear={fiscalYear}
-            lang={lang}
-            onNavigateToTaxCenter={handleNavigateToTaxCenter}
-            onOpenManualPayment={handleOpenManualPayment}
-            onOpenCsvImport={() => setIsCsvImportOpen(true)}
-            onOpenRetroModal={() => setIsRetroModalOpen(true)}
-            onOpenBatch1099={handleBatch1099}
-            onOpenAddContractor={() => {
-              setContractorToEdit(null);
-              setIsContractorModalOpen(true);
-            }}
-            searchQuery={searchQuery}
-          />
-        )}
+        {/* View Switcher Container with responsive safe bottom margin for mobile nav */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden pb-16 md:pb-0">
+          {currentTab === 'dashboard' && (
+            <DashboardView
+              contractors={contractors}
+              payments={payments}
+              fiscalYear={fiscalYear}
+              lang={lang}
+              onNavigateToTaxCenter={handleNavigateToTaxCenter}
+              onOpenManualPayment={handleOpenManualPayment}
+              onOpenCsvImport={() => setIsCsvImportOpen(true)}
+              onOpenRetroModal={() => setIsRetroModalOpen(true)}
+              onOpenBatch1099={handleBatch1099}
+              onOpenAddContractor={() => {
+                setContractorToEdit(null);
+                setIsContractorModalOpen(true);
+              }}
+              searchQuery={searchQuery}
+            />
+          )}
 
-        {currentTab === 'tax-center' && (
-          <TaxCenterView
-            contractors={contractors}
-            payments={payments}
-            company={company}
-            fiscalYear={fiscalYear}
-            lang={lang}
-            selectedContractorId={selectedContractorId}
-            onSelectContractor={setSelectedContractorId}
-            onOpenPaymentsSummary={handleOpenPaymentsSummary}
-            onOpenEmailModal={handleOpenEmailModal}
-            onOpenContractorDirectory={() => setCurrentTab('contractors')}
-            onOpenW9Modal={handleOpenW9Modal}
-          />
-        )}
+          {currentTab === 'tax-center' && (
+            <TaxCenterView
+              contractors={contractors}
+              payments={payments}
+              company={company}
+              fiscalYear={fiscalYear}
+              lang={lang}
+              selectedContractorId={selectedContractorId}
+              onSelectContractor={setSelectedContractorId}
+              onOpenPaymentsSummary={handleOpenPaymentsSummary}
+              onOpenEmailModal={handleOpenEmailModal}
+              onOpenContractorDirectory={() => setCurrentTab('contractors')}
+              onOpenW9Modal={handleOpenW9Modal}
+            />
+          )}
 
-        {currentTab === 'contractors' && (
-          <ContractorsView
-            contractors={contractors}
-            payments={payments}
-            fiscalYear={fiscalYear}
-            lang={lang}
-            onAddContractor={() => {
-              setContractorToEdit(null);
-              setIsContractorModalOpen(true);
-            }}
-            onEditContractor={(c) => {
-              setContractorToEdit(c);
-              setIsContractorModalOpen(true);
-            }}
-            onDeleteContractor={handleDeleteContractor}
-            onView1099={handleNavigateToTaxCenter}
-            onRecordPayment={handleOpenManualPayment}
-            onOpenW9Modal={handleOpenW9Modal}
-          />
-        )}
+          {currentTab === 'contractors' && (
+            <ContractorsView
+              contractors={contractors}
+              payments={payments}
+              fiscalYear={fiscalYear}
+              lang={lang}
+              onAddContractor={() => {
+                setContractorToEdit(null);
+                setIsContractorModalOpen(true);
+              }}
+              onEditContractor={(c) => {
+                setContractorToEdit(c);
+                setIsContractorModalOpen(true);
+              }}
+              onDeleteContractor={handleDeleteContractor}
+              onView1099={handleNavigateToTaxCenter}
+              onRecordPayment={handleOpenManualPayment}
+              onOpenW9Modal={handleOpenW9Modal}
+            />
+          )}
 
-        {currentTab === 'payments' && (
-          <PaymentsLedgerView
-            payments={payments}
-            contractors={contractors}
-            fiscalYear={fiscalYear}
-            lang={lang}
-            onOpenManualPayment={() => handleOpenManualPayment()}
-            onDeletePayment={handleDeletePayment}
-          />
-        )}
+          {currentTab === 'payments' && (
+            <PaymentsLedgerView
+              payments={payments}
+              contractors={contractors}
+              fiscalYear={fiscalYear}
+              lang={lang}
+              onOpenManualPayment={() => handleOpenManualPayment()}
+              onDeletePayment={handleDeletePayment}
+            />
+          )}
 
-        {currentTab === 'reportes' && (
-          <ReportsView
-            company={company}
-            contractors={contractors}
-            payments={payments}
-            fiscalYear={fiscalYear}
-            lang={lang}
-          />
-        )}
+          {currentTab === 'reportes' && (
+            <ReportsView
+              company={company}
+              contractors={contractors}
+              payments={payments}
+              fiscalYear={fiscalYear}
+              lang={lang}
+            />
+          )}
 
-        {currentTab === 'settings' && (
-          <SettingsView
-            company={company}
-            onSaveCompany={setCompany}
-            lang={lang}
-            irsFireConfigured={irsFireConfigured}
-            onToggleIrsFire={handleToggleIrsFire}
-          />
-        )}
+          {currentTab === 'settings' && (
+            <SettingsView
+              company={company}
+              onSaveCompany={setCompany}
+              lang={lang}
+              irsFireConfigured={irsFireConfigured}
+              onToggleIrsFire={handleToggleIrsFire}
+            />
+          )}
 
-        {currentTab === 'soporte' && <SupportView lang={lang} />}
+          {currentTab === 'soporte' && <SupportView lang={lang} />}
+        </div>
       </div>
+
+      {/* Native Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+      />
+
+      {/* Mobile Drawer (Bottom Sheet) */}
+      <MobileMenuDrawer
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        company={company}
+        lang={lang}
+        onOpenPayroll={() => setIsPayrollModalOpen(true)}
+        onOpenCompanySettings={() => setIsCompanyModalOpen(true)}
+        onOpenDemoVideo={() => setIsDemoVideoOpen(true)}
+        onToggleSampleData={handleToggleSampleData}
+        hasSampleData={hasSampleData}
+        irsFireConfigured={irsFireConfigured}
+        onToggleIrsFire={handleToggleIrsFire}
+      />
 
       {/* Modals */}
       <CompanyConfigModal
